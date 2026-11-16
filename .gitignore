@@ -1,0 +1,8 @@
+# Raw register CSV (large, re-downloadable from gov.uk)
+data/register-*.csv
+
+# Generated data (large; regenerate with process.py)
+data/sponsors.json
+
+__pycache__/
+*.pyc

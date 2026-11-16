@@ -1,0 +1,237 @@
+<title>UK Sponsor Checker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: single centered column — sticky search header, scrollable results list below. */
+  :root {
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef1f5;
+    --fg: #15202b;
+    --muted: #5a6b7b;
+    --line: #d6dde4;
+    --accent: #1d4ed8;
+    --accent-ink: #ffffff;
+    --good-bg: #dcefe1; --good-fg: #11633a;
+    --warn-bg: #fdeecc; --warn-fg: #8a5a08;
+    --chip-bg: #e7edf6; --chip-fg: #27405f;
+    --shadow: 0 1px 2px rgba(16,34,54,.08), 0 6px 20px rgba(16,34,54,.06);
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --head: "Space Grotesk", var(--sans);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e141b; --surface: #171f29; --surface-2: #1f2a36;
+      --fg: #e7edf4; --muted: #9fb0c0; --line: #2a3744;
+      --accent: #5b8bff; --accent-ink: #0b1017;
+      --good-bg: #16342a; --good-fg: #74d6a3;
+      --warn-bg: #3a2e13; --warn-fg: #f0c674;
+      --chip-bg: #223146; --chip-fg: #bcd0ec;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e141b; --surface: #171f29; --surface-2: #1f2a36;
+    --fg: #e7edf4; --muted: #9fb0c0; --line: #2a3744;
+    --accent: #5b8bff; --accent-ink: #0b1017;
+    --good-bg: #16342a; --good-fg: #74d6a3;
+    --warn-bg: #3a2e13; --warn-fg: #f0c674;
+    --chip-bg: #223146; --chip-fg: #bcd0ec;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); line-height: 1.5; }
+  .wrap { max-width: 860px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left,0px)); padding-right: max(16px, env(safe-area-inset-right,0px)); }
+
+  header.hero { padding-block: 28px 10px; }
+  .eyebrow { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--head); font-size: clamp(1.7rem, 4.5vw, 2.4rem); margin: 6px 0 4px; letter-spacing: -.01em; text-wrap: balance; }
+  .lede { color: var(--muted); margin: 0; max-width: 60ch; font-size: .96rem; }
+
+  .searchbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 12px; }
+  .field { position: relative; }
+  .field svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
+  #q {
+    width: 100%; font: inherit; font-size: 1.05rem; padding: 14px 44px 14px 42px;
+    border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg);
+    box-shadow: var(--shadow); outline: none;
+  }
+  #q:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  #clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: var(--surface-2); color: var(--muted); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 1rem; line-height: 1; }
+  #clear:hover { color: var(--fg); }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); color: var(--muted); font: inherit; font-size: .82rem; padding: 6px 12px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .count { margin-left: auto; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .list { display: flex; flex-direction: column; gap: 10px; padding-block: 6px 28px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .card .top { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+  .cname { font-family: var(--head); font-weight: 600; font-size: 1.05rem; margin: 0; min-width: 0; word-break: break-word; }
+  .loc { color: var(--muted); font-size: .85rem; margin: 2px 0 0; }
+  .badge { flex: none; font-size: .74rem; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+  .badge.a { background: var(--good-bg); color: var(--good-fg); }
+  .badge.b { background: var(--warn-bg); color: var(--warn-fg); }
+  .routes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { font-size: .76rem; background: var(--chip-bg); color: var(--chip-fg); padding: 3px 9px; border-radius: 7px; }
+  .chip.tw { opacity: .85; }
+  mark { background: color-mix(in srgb, var(--accent) 28%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+  .msg { text-align: center; color: var(--muted); padding: 40px 10px; }
+  .msg strong { color: var(--fg); }
+  footer { color: var(--muted); font-size: .78rem; padding-block: 8px 30px; border-top: 1px solid var(--line); margin-top: 8px; }
+  footer a { color: var(--accent); }
+  .skel { height: 64px; border-radius: 12px; background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 37%, var(--surface) 63%); background-size: 400% 100%; animation: sh 1.2s ease infinite; }
+  @keyframes sh { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+  @media (prefers-reduced-motion: reduce){ .skel{ animation: none } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Home Office licensed sponsor register</div>
+    <h1>UK Sponsor Checker</h1>
+    <p class="lede">Search the official Worker &amp; Temporary Worker sponsor register to see whether an employer can sponsor a UK work visa, their licence rating, and which routes they hold.</p>
+  </header>
+
+  <div class="searchbar">
+    <div class="field">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="Type a company name..." autocomplete="off" aria-label="Company name">
+      <button id="clear" hidden aria-label="Clear">&times;</button>
+    </div>
+    <div class="filters">
+      <div class="seg" role="group" aria-label="Filter by rating">
+        <button data-rate="all" aria-pressed="true">All</button>
+        <button data-rate="A" aria-pressed="false">A-rated only</button>
+      </div>
+      <span class="count" id="count"></span>
+    </div>
+  </div>
+
+  <div class="list" id="list" aria-live="polite"></div>
+
+  <footer>
+    <span id="meta">Loading register…</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var listEl = document.getElementById('list');
+  var countEl = document.getElementById('count');
+  var metaEl = document.getElementById('meta');
+  var q = document.getElementById('q');
+  var clearBtn = document.getElementById('clear');
+  var rateBtns = document.querySelectorAll('.seg button');
+
+  var DATA = null, NAMES = null, rateFilter = 'all', LIMIT = 150;
+
+  function skeletons() {
+    var h = '';
+    for (var i = 0; i < 5; i++) h += '<div class="skel"></div>';
+    listEl.innerHTML = h;
+  }
+  function esc(s){ return s.replace(/[&<>]/g, function(c){ return c==='&'?'&amp;':c==='<'?'&lt;':'&gt;'; }); }
+  function hi(name, term){
+    if (!term) return esc(name);
+    var i = name.toLowerCase().indexOf(term);
+    if (i < 0) return esc(name);
+    return esc(name.slice(0,i)) + '<mark>' + esc(name.slice(i, i+term.length)) + '</mark>' + esc(name.slice(i+term.length));
+  }
+
+  function render(term) {
+    if (!DATA) return;
+    var recs = DATA.records, routes = DATA.routes, ratings = DATA.ratings;
+    var out = [], matched = 0;
+    var tl = term.toLowerCase();
+    // starts-with first, then contains, for relevance
+    var starts = [], contains = [];
+    for (var i = 0; i < recs.length; i++) {
+      var nm = NAMES[i];
+      if (tl) {
+        var pos = nm.indexOf(tl);
+        if (pos < 0) continue;
+      }
+      if (rateFilter === 'A') {
+        var hasA = false, rr = recs[i][3];
+        for (var k = 0; k < rr.length; k++) if (ratings[rr[k][2]] === 'A') { hasA = true; break; }
+        if (!hasA) continue;
+      }
+      matched++;
+      if (!tl || nm.indexOf(tl) === 0) { if (starts.length < LIMIT) starts.push(i); }
+      else { if (contains.length < LIMIT) contains.push(i); }
+    }
+    var show = starts.concat(contains).slice(0, LIMIT);
+
+    if (!matched) {
+      listEl.innerHTML = '<div class="msg"><strong>No sponsor found</strong><br>No licensed sponsor matches &ldquo;' + esc(term) + '&rdquo;. That doesn&rsquo;t always mean they can&rsquo;t sponsor &mdash; the register uses legal entity names, so try a shorter or parent-company name.</div>';
+      countEl.textContent = '0 matches';
+      return;
+    }
+
+    for (var s = 0; s < show.length; s++) {
+      var r = recs[show[s]];
+      var name = r[0], town = r[1], county = r[2], rr2 = r[3];
+      // best rating across routes
+      var best = 'B';
+      for (var j = 0; j < rr2.length; j++) if (ratings[rr2[j][2]] === 'A') { best = 'A'; break; }
+      var loc = [town, county].filter(Boolean).join(', ') || 'Location not listed';
+      var chips = '';
+      var seen = {};
+      for (var j2 = 0; j2 < rr2.length; j2++) {
+        var rt = routes[rr2[j2][0]];
+        var tw = DATA.tiers[rr2[j2][1]] === 'Temporary Worker';
+        var key = rt + (tw?'|t':'');
+        if (seen[key]) continue; seen[key] = 1;
+        chips += '<span class="chip' + (tw?' tw':'') + '">' + esc(rt) + '</span>';
+      }
+      var badge = best === 'A'
+        ? '<span class="badge a">A-rated &middot; sponsoring</span>'
+        : '<span class="badge b">B-rated &middot; action plan</span>';
+      out.push(
+        '<div class="card"><div class="top"><div style="min-width:0">' +
+          '<p class="cname">' + hi(name, tl) + '</p>' +
+          '<p class="loc">' + esc(loc) + '</p>' +
+        '</div>' + badge + '</div>' +
+        '<div class="routes">' + chips + '</div></div>'
+      );
+    }
+    listEl.innerHTML = out.join('');
+    var cap = matched > show.length ? ('Showing ' + show.length + ' of ' + matched.toLocaleString() + ' matches') : (matched.toLocaleString() + (matched === 1 ? ' match' : ' matches'));
+    countEl.textContent = cap;
+  }
+
+  var t;
+  function onInput() {
+    clearBtn.hidden = !q.value;
+    clearTimeout(t);
+    t = setTimeout(function(){ render(q.value.trim()); }, 120);
+  }
+  q.addEventListener('input', onInput);
+  clearBtn.addEventListener('click', function(){ q.value=''; clearBtn.hidden=true; q.focus(); render(''); });
+  rateBtns.forEach(function(b){
+    b.addEventListener('click', function(){
+      rateFilter = b.getAttribute('data-rate');
+      rateBtns.forEach(function(x){ x.setAttribute('aria-pressed', x===b ? 'true':'false'); });
+      render(q.value.trim());
+    });
+  });
+
+  skeletons();
+  fetch('sponsors.json').then(function(r){ return r.json(); }).then(function(d){
+    DATA = d;
+    NAMES = d.records.map(function(x){ return x[0].toLowerCase(); });
+    metaEl.innerHTML = 'Source: ' + esc(d.meta.source) + '. Register dated <strong>' + esc(d.meta.register_date) +
+      '</strong> &middot; ' + d.meta.company_count.toLocaleString() + ' licensed organisations. ' +
+      'Always verify on <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener">gov.uk</a> &mdash; an A rating means a live licence in good standing; B means a time-limited action plan.';
+    render('');
+    q.focus();
+  }).catch(function(){
+    listEl.innerHTML = '<div class="msg"><strong>Couldn’t load the register</strong><br>The data file failed to load. Reload the page to try again.</div>';
+  });
+})();
+</script>
